@@ -4,6 +4,7 @@ const path = require('path');
 const crypto = require('crypto');
 const { promisify } = require('util');
 const { Pool } = require('pg');
+const nodemailer = require('nodemailer');
 const scrypt = promisify(crypto.scrypt);
 const root = __dirname;
 const pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : undefined, max: 8 });
@@ -14,6 +15,12 @@ function readJson(req) { return new Promise((resolve, reject) => { let raw = '';
 function cookies(req) { return Object.fromEntries((req.headers.cookie || '').split(';').map(x => x.trim()).filter(Boolean).map(x => { const i=x.indexOf('='); return [x.slice(0,i), decodeURIComponent(x.slice(i+1))]; })); }
 function sessionCookie(token, maxAge = 60 * 60 * 24 * 30) { return `${cookieName}=${encodeURIComponent(token)}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${maxAge}${process.env.NODE_ENV === 'production' ? '; Secure' : ''}`; }
 function publicUser(row) { return { id: row.id, username: row.username, email: row.email, avatar: row.avatar_data || null }; }
+function codeDigest(code) { return crypto.createHmac('sha256', process.env.EMAIL_CODE_SECRET || 'local-yanki-email-code-secret').update(code).digest('hex'); }
+async function deliverCode(email, code) {
+  if (!process.env.GMAIL_USER || !process.env.GMAIL_APP_PASSWORD) throw new Error('Gmail gönderici hesabı ayarlanmamış.');
+  const transporter=nodemailer.createTransport({service:'gmail',auth:{user:process.env.GMAIL_USER,pass:process.env.GMAIL_APP_PASSWORD.replace(/\s/g,'')}});
+  await transporter.sendMail({from:`Yankı <${process.env.GMAIL_USER}>`,to:email,subject:'Yankı e-posta doğrulama kodun',text:`Yankı hesabını doğrulamak için bu kodu kullan: ${code}\n\nKod 10 dakika içinde sona erer. Bu isteği sen yapmadıysan bu e-postayı yok say.`,html:`<div style="font-family:Arial,sans-serif;max-width:480px;margin:auto;padding:28px;color:#24221f"><div style="font-size:13px;letter-spacing:4px;color:#e7462f">YANKI / SES ODASI</div><h1 style="font-family:Georgia,serif;font-weight:500">E-postanı doğrula</h1><p>Hesabını açmak için bu kodu kullan:</p><div style="font-size:32px;letter-spacing:8px;font-weight:bold;padding:18px;background:#f4ead8;border:1px solid #24221f;text-align:center">${code}</div><p style="font-size:13px;color:#67615a">Kod 10 dakika içinde sona erer. Bu isteği sen yapmadıysan bu e-postayı yok say.</p></div>`});
+}
 async function getUser(req) { const token = cookies(req)[cookieName]; if (!token) return null; const tokenHash = crypto.createHash('sha256').update(token).digest('hex'); const r = await pool.query('SELECT u.id,u.username,u.email,u.avatar_data FROM yanki_sessions s JOIN yanki_users u ON u.id=s.user_id WHERE s.token_hash=$1 AND s.expires_at>NOW()', [tokenHash]); return r.rows[0] || null; }
 async function createSession(userId, res) { const token = crypto.randomBytes(32).toString('base64url'); const hash = crypto.createHash('sha256').update(token).digest('hex'); const expiry = new Date(Date.now() + sessionMs); await pool.query('INSERT INTO yanki_sessions(token_hash,user_id,expires_at) VALUES($1,$2,$3)', [hash,userId,expiry]); res.setHeader('Set-Cookie', sessionCookie(token)); }
 async function authApi(req, res, pathname) {
@@ -22,14 +29,30 @@ async function authApi(req, res, pathname) {
     if (!/^[A-Za-z0-9_-]{3,20}$/.test(username)) return json(res,400,{error:'Kullanıcı adı 3–20 karakter olmalı; harf, rakam, _ ve - kullanabilirsin.'});
     if (email.length>254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return json(res,400,{error:'Geçerli bir e-posta adresi yaz.'});
     if (password.length<8 || password.length>200) return json(res,400,{error:'Şifre en az 8 karakter olmalı.'});
-    const salt=crypto.randomBytes(16); const hash=await scrypt(password,salt,64);
-    try { const r=await pool.query('INSERT INTO yanki_users(username,email,password_hash) VALUES($1,$2,$3) RETURNING id,username,email,avatar_data',[username,email,`${salt.toString('hex')}:${hash.toString('hex')}`]); await createSession(r.rows[0].id,res); return json(res,201,{user:publicUser(r.rows[0])}); }
+    if(!process.env.GMAIL_USER||!process.env.GMAIL_APP_PASSWORD)return json(res,503,{error:'E-posta doğrulama göndericisi henüz ayarlanmamış.'});
+    const salt=crypto.randomBytes(16); const hash=await scrypt(password,salt,64); const code=String(crypto.randomInt(100000,1000000)); let user;
+    try { const r=await pool.query('INSERT INTO yanki_users(username,email,password_hash,email_verified) VALUES($1,$2,$3,FALSE) RETURNING id,username,email,avatar_data',[username,email,`${salt.toString('hex')}:${hash.toString('hex')}`]); user=r.rows[0]; await pool.query('INSERT INTO yanki_verification_codes(user_id,code_hash,expires_at,sent_at) VALUES($1,$2,NOW()+INTERVAL \'10 minutes\',NOW())',[user.id,codeDigest(code)]); }
     catch(e){if(e.code==='23505')return json(res,409,{error:'Bu kullanıcı adı veya e-posta zaten kullanılıyor.'});throw e;}
+    try { await deliverCode(email,code); return json(res,202,{pending:true,email}); }
+    catch(e){console.error('Verification email delivery failed.');return json(res,502,{error:'Doğrulama e-postası gönderilemedi. Biraz sonra yeniden gönder.'});}
   }
   if (pathname === '/api/login' && req.method === 'POST') {
-    const b=await readJson(req); const email=String(b.email||'').trim().toLowerCase(); const password=String(b.password||''); const r=await pool.query('SELECT id,username,email,avatar_data,password_hash FROM yanki_users WHERE email=$1',[email]); const row=r.rows[0];
+    const b=await readJson(req); const email=String(b.email||'').trim().toLowerCase(); const password=String(b.password||''); const r=await pool.query('SELECT id,username,email,avatar_data,password_hash,email_verified FROM yanki_users WHERE email=$1',[email]); const row=r.rows[0];
     if(!row)return json(res,401,{error:'E-posta veya şifre hatalı.'}); const [saltHex,hashHex]=row.password_hash.split(':'); const actual=await scrypt(password,Buffer.from(saltHex,'hex'),64); const expected=Buffer.from(hashHex,'hex');
-    if(actual.length!==expected.length||!crypto.timingSafeEqual(actual,expected))return json(res,401,{error:'E-posta veya şifre hatalı.'}); await createSession(row.id,res); return json(res,200,{user:publicUser(row)});
+    if(actual.length!==expected.length||!crypto.timingSafeEqual(actual,expected))return json(res,401,{error:'E-posta veya şifre hatalı.'}); if(!row.email_verified)return json(res,403,{error:'Önce e-posta adresini doğrula.',needsVerification:true,email:row.email}); await createSession(row.id,res); return json(res,200,{user:publicUser(row)});
+  }
+  if(pathname==='/api/verify-email'&&req.method==='POST'){
+    const b=await readJson(req);const email=String(b.email||'').trim().toLowerCase();const code=String(b.code||'').trim();if(!/^\d{6}$/.test(code))return json(res,400,{error:'6 haneli kodu gir.'});
+    const u=await pool.query('SELECT id,username,email,avatar_data,email_verified FROM yanki_users WHERE email=$1',[email]);const user=u.rows[0];if(!user)return json(res,400,{error:'Kod geçersiz veya süresi dolmuş.'});if(user.email_verified){await createSession(user.id,res);return json(res,200,{user:publicUser(user)});}
+    const v=await pool.query('SELECT code_hash,expires_at,attempts FROM yanki_verification_codes WHERE user_id=$1',[user.id]);const row=v.rows[0];if(!row||new Date(row.expires_at)<new Date()||row.attempts>=5)return json(res,400,{error:'Kod geçersiz veya süresi dolmuş. Yeni kod iste.'});
+    const actual=Buffer.from(codeDigest(code),'hex'),expected=Buffer.from(row.code_hash,'hex');if(actual.length!==expected.length||!crypto.timingSafeEqual(actual,expected)){await pool.query('UPDATE yanki_verification_codes SET attempts=attempts+1 WHERE user_id=$1',[user.id]);return json(res,400,{error:'Kod yanlış. Tekrar dene.'});}
+    await pool.query('UPDATE yanki_users SET email_verified=TRUE WHERE id=$1',[user.id]);await pool.query('DELETE FROM yanki_verification_codes WHERE user_id=$1',[user.id]);await createSession(user.id,res);return json(res,200,{user:publicUser(user)});
+  }
+  if(pathname==='/api/resend-code'&&req.method==='POST'){
+    const b=await readJson(req);const email=String(b.email||'').trim().toLowerCase();const r=await pool.query('SELECT id,email_verified FROM yanki_users WHERE email=$1',[email]);const user=r.rows[0];if(!user||user.email_verified)return json(res,200,{ok:true});
+    const v=await pool.query('SELECT sent_at FROM yanki_verification_codes WHERE user_id=$1',[user.id]);if(v.rows[0]&&Date.now()-new Date(v.rows[0].sent_at).getTime()<60000)return json(res,429,{error:'Yeni kod istemeden önce bir dakika bekle.'});
+    const code=String(crypto.randomInt(100000,1000000));await pool.query('INSERT INTO yanki_verification_codes(user_id,code_hash,expires_at,sent_at,attempts) VALUES($1,$2,NOW()+INTERVAL \'10 minutes\',NOW(),0) ON CONFLICT(user_id) DO UPDATE SET code_hash=EXCLUDED.code_hash,expires_at=EXCLUDED.expires_at,sent_at=EXCLUDED.sent_at,attempts=0',[user.id,codeDigest(code)]);
+    try{await deliverCode(email,code);return json(res,200,{ok:true})}catch(e){console.error('Verification email delivery failed.');return json(res,502,{error:'E-posta gönderilemedi. Daha sonra yeniden dene.'})}
   }
   if (pathname === '/api/logout' && req.method === 'POST') { const token=cookies(req)[cookieName]; if(token)await pool.query('DELETE FROM yanki_sessions WHERE token_hash=$1',[crypto.createHash('sha256').update(token).digest('hex')]); return json(res,200,{ok:true},{'Set-Cookie':sessionCookie('',0)}); }
   const user=await getUser(req);
@@ -51,6 +74,7 @@ const server = http.createServer(async (req, res) => {
   fs.readFile(path.join(root, file), (err, data) => { if (err) { res.writeHead(404); return res.end('Not found'); } res.writeHead(200, { 'Content-Type': types[file] || 'application/octet-stream' }); res.end(data); });
 });
 const rooms = new Map();
+const roomLives = new Map();
 function send(ws, value) {
   if (ws.destroyed) return;
   const data = Buffer.from(JSON.stringify(value)); let header;
@@ -87,14 +111,25 @@ server.on('upgrade', async (req, ws) => {
           rooms.set(room, new Map());
         }
         peerId = Math.random().toString(36).slice(2, 9); const peers = rooms.get(room);
-        send(ws, { type: 'joined', id: peerId, peers: [...peers.values()].map(p => ({ id: p.id, name: p.name })) });
+        const live=roomLives.get(room)||null;
+        send(ws, { type: 'joined', id: peerId, peers: [...peers.values()].map(p => ({ id: p.id, name: p.name })), live });
         for (const p of peers.values()) send(p.ws, { type: 'peer-joined', id: peerId, name }); peers.set(peerId, { id: peerId, name, ws });
+        if(live&&live.id!==peerId)send(ws,{type:'live-start',id:live.id,name:live.name});
+      } else if(room&&msg.type==='live-start'){
+        const active=roomLives.get(room);if(active&&active.id!==peerId){send(ws,{type:'live-error',message:'Bu odada zaten bir yayın açık.'});continue;}
+        const live={id:peerId,name};roomLives.set(room,live);for(const p of rooms.get(room)?.values()||[])if(p.id!==peerId)send(p.ws,{type:'live-start',...live});
+      } else if(room&&msg.type==='live-stop'){
+        if(roomLives.get(room)?.id===peerId){roomLives.delete(room);for(const p of rooms.get(room)?.values()||[])if(p.id!==peerId)send(p.ws,{type:'live-stop',id:peerId});}
+      } else if(room&&msg.type==='live-viewer-join'){
+        const live=roomLives.get(room);const broadcaster=live&&rooms.get(room)?.get(live.id);if(broadcaster)send(broadcaster.ws,{type:'live-viewer-join',from:peerId,name});else send(ws,{type:'live-stop',id:live?.id});
+      } else if(room&&['live-offer','live-answer','live-candidate'].includes(msg.type)){
+        const to=rooms.get(room)?.get(msg.to);if(to)send(to.ws,{...msg,from:peerId,name});
       } else if (room && ['offer', 'answer', 'candidate', 'mute'].includes(msg.type)) {
         const to = rooms.get(room)?.get(msg.to); if (to) send(to.ws, { ...msg, from: peerId, name });
       }
     }
   });
-  ws.on('close', () => { if (!room || !peerId) return; const peers = rooms.get(room); peers?.delete(peerId); for (const p of peers?.values() || []) send(p.ws, { type: 'peer-left', id: peerId }); if (peers?.size === 0) rooms.delete(room); });
+  ws.on('close', () => { if (!room || !peerId) return; const peers = rooms.get(room); if(roomLives.get(room)?.id===peerId){roomLives.delete(room);for(const p of peers?.values()||[])if(p.id!==peerId)send(p.ws,{type:'live-stop',id:peerId});}peers?.delete(peerId); for (const p of peers?.values() || []) send(p.ws, { type: 'peer-left', id: peerId }); if (peers?.size === 0) { rooms.delete(room); roomLives.delete(room); } });
 });
 const port = process.env.PORT || 3000;
 async function start() {
@@ -105,13 +140,22 @@ async function start() {
     email VARCHAR(254) NOT NULL UNIQUE,
     password_hash TEXT NOT NULL,
     avatar_data TEXT,
+    email_verified BOOLEAN NOT NULL DEFAULT TRUE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
   )`);
+  await pool.query('ALTER TABLE yanki_users ADD COLUMN IF NOT EXISTS email_verified BOOLEAN NOT NULL DEFAULT TRUE');
   await pool.query('CREATE UNIQUE INDEX IF NOT EXISTS yanki_users_username_lower_idx ON yanki_users (LOWER(username))');
   await pool.query(`CREATE TABLE IF NOT EXISTS yanki_sessions (
     token_hash CHAR(64) PRIMARY KEY,
     user_id BIGINT NOT NULL REFERENCES yanki_users(id) ON DELETE CASCADE,
     expires_at TIMESTAMPTZ NOT NULL
+  )`);
+  await pool.query(`CREATE TABLE IF NOT EXISTS yanki_verification_codes (
+    user_id BIGINT PRIMARY KEY REFERENCES yanki_users(id) ON DELETE CASCADE,
+    code_hash CHAR(64) NOT NULL,
+    expires_at TIMESTAMPTZ NOT NULL,
+    sent_at TIMESTAMPTZ NOT NULL,
+    attempts SMALLINT NOT NULL DEFAULT 0
   )`);
   server.listen(port, () => console.log(`Sesli Sohbet hazır: http://localhost:${port}`));
 }
