@@ -28,17 +28,19 @@ async function connect(room){
   socket.onclose=()=>{if(!roomView.classList.contains('hidden'))toast('Bağlantı kesildi. Yeniden katılmayı deneyebilirsin.')};
   socket.onmessage=async event=>{const m=JSON.parse(event.data);
     if(m.type==='error'){toast(m.message);return}
-    if(m.type==='joined'){myId=m.id;addPerson(myId,name,true);for(const p of m.peers){addPerson(p.id,p.name);await createOffer(p.id)}}
+    // The newcomer waits for existing room members to initiate. This avoids
+    // both peers creating offers at once (WebRTC offer glare).
+    if(m.type==='joined'){myId=m.id;addPerson(myId,name,true);for(const p of m.peers)addPerson(p.id,p.name)}
     if(m.type==='peer-joined'){addPerson(m.id,m.name);await createOffer(m.id)}
-    if(m.type==='offer'){const pc=makePeer(m.from);await pc.setRemoteDescription(m.sdp);const answer=await pc.createAnswer();await pc.setLocalDescription(answer);send({type:'answer',to:m.from,sdp:pc.localDescription})}
-    if(m.type==='answer'){const pc=connections.get(m.from);if(pc)await pc.setRemoteDescription(m.sdp)}
-    if(m.type==='candidate'){try{await connections.get(m.from)?.addIceCandidate(m.candidate)}catch{}}
+    if(m.type==='offer'){const pc=connections.get(m.from)||makePeer(m.from);await pc.setRemoteDescription(m.sdp);for(const c of pc.pendingCandidates.splice(0))try{await pc.addIceCandidate(c)}catch{}const answer=await pc.createAnswer();await pc.setLocalDescription(answer);send({type:'answer',to:m.from,sdp:pc.localDescription})}
+    if(m.type==='answer'){const pc=connections.get(m.from);if(pc){await pc.setRemoteDescription(m.sdp);for(const c of pc.pendingCandidates.splice(0))try{await pc.addIceCandidate(c)}catch{}}}
+    if(m.type==='candidate'){const pc=connections.get(m.from);if(pc){try{if(pc.remoteDescription)await pc.addIceCandidate(m.candidate);else pc.pendingCandidates.push(m.candidate)}catch{}}}
     if(m.type==='peer-left')removePerson(m.id);
     if(m.type==='mute'){const card=document.getElementById(`person-${m.from}`);if(card){card.querySelector('.person-meta').textContent=m.muted?'Mikrofon kapalı':'Bağlı';card.querySelector('.person-mic').textContent=m.muted?'⊘':'♩'}}
   };
 }
 function makePeer(id){
-  const pc=new RTCPeerConnection({iceServers:[{urls:'stun:stun.l.google.com:19302'},{urls:'stun:stun1.l.google.com:19302'}]});connections.set(id,pc);
+  const pc=new RTCPeerConnection({iceServers:[{urls:'stun:stun.l.google.com:19302'},{urls:'stun:stun1.l.google.com:19302'}]});pc.pendingCandidates=[];connections.set(id,pc);
   localStream.getTracks().forEach(track=>pc.addTrack(track,localStream));
   pc.onicecandidate=e=>{if(e.candidate)send({type:'candidate',to:id,candidate:e.candidate})};
   pc.ontrack=e=>{let audio=document.getElementById(`audio-${id}`);if(!audio){audio=document.createElement('audio');audio.id=`audio-${id}`;audio.autoplay=true;document.body.append(audio)}audio.srcObject=e.streams[0];audio.play().catch(()=>{});const c=document.getElementById(`person-${id}`);if(c)c.querySelector('.person-meta').textContent='Bağlı';startMeter(e.streams[0],id)};
@@ -56,3 +58,4 @@ async function copy(text){try{await navigator.clipboard.writeText(text);toast('K
 $('copy').onclick=()=>copy(`${location.origin}/?room=${roomCode}`);$('copyCode').onclick=()=>copy(roomCode);
 $('leave').onclick=()=>{socket?.close();connections.forEach(pc=>pc.close());connections.clear();localStream?.getTracks().forEach(t=>t.stop());document.querySelectorAll('audio[id^="audio-"]').forEach(a=>a.remove());roomView.classList.add('hidden');welcome.classList.remove('hidden');muted=false;$('mute').classList.remove('active');$('muteLabel').textContent='Mikrofonu kapat'};
 const invite=new URLSearchParams(location.search).get('room');if(invite){roomInput.value=invite;setTimeout(()=>connect(invite),250)}
+
