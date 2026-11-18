@@ -38,7 +38,11 @@ server.on('upgrade', (req, ws) => {
       if (msg.type === 'join') {
         room = String(msg.room || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8); name = String(msg.name || 'Misafir').trim().slice(0, 24) || 'Misafir';
         if (!room) { send(ws, { type: 'error', message: 'Oda kodu gerekli.' }); continue; }
-        peerId = Math.random().toString(36).slice(2, 9); if (!rooms.has(room)) rooms.set(room, new Map()); const peers = rooms.get(room);
+        if (!rooms.has(room)) {
+          if (!msg.create) { send(ws, { type: 'error', message: 'Bu oda bulunamadı. Oda kodunu kontrol et.' }); continue; }
+          rooms.set(room, new Map());
+        }
+        peerId = Math.random().toString(36).slice(2, 9); const peers = rooms.get(room);
         send(ws, { type: 'joined', id: peerId, peers: [...peers.values()].map(p => ({ id: p.id, name: p.name })) });
         for (const p of peers.values()) send(p.ws, { type: 'peer-joined', id: peerId, name }); peers.set(peerId, { id: peerId, name, ws });
       } else if (room && ['offer', 'answer', 'candidate', 'mute'].includes(msg.type)) {
