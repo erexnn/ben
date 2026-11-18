@@ -30,9 +30,23 @@ async function authApi(req, res, pathname) {
     if (email.length>254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return json(res,400,{error:'Geçerli bir e-posta adresi yaz.'});
     if (password.length<8 || password.length>200) return json(res,400,{error:'Şifre en az 8 karakter olmalı.'});
     if(!process.env.GMAIL_USER||!process.env.GMAIL_APP_PASSWORD)return json(res,503,{error:'E-posta doğrulama göndericisi henüz ayarlanmamış.'});
-    const salt=crypto.randomBytes(16); const hash=await scrypt(password,salt,64); const code=String(crypto.randomInt(100000,1000000)); let user;
-    try { const r=await pool.query('INSERT INTO yanki_users(username,email,password_hash,email_verified) VALUES($1,$2,$3,FALSE) RETURNING id,username,email,avatar_data',[username,email,`${salt.toString('hex')}:${hash.toString('hex')}`]); user=r.rows[0]; await pool.query('INSERT INTO yanki_verification_codes(user_id,code_hash,expires_at,sent_at) VALUES($1,$2,NOW()+INTERVAL \'10 minutes\',NOW())',[user.id,codeDigest(code)]); }
-    catch(e){if(e.code==='23505')return json(res,409,{error:'Bu kullanıcı adı veya e-posta zaten kullanılıyor.'});throw e;}
+    const salt=crypto.randomBytes(16); const hash=await scrypt(password,salt,64); const passwordHash=`${salt.toString('hex')}:${hash.toString('hex')}`; const code=String(crypto.randomInt(100000,1000000)); let user;
+    try {
+      const existing=await pool.query('SELECT id,email_verified FROM yanki_users WHERE email=$1',[email]);
+      if(existing.rows[0]?.email_verified)return json(res,409,{error:'Bu e-posta zaten kayıtlı. Giriş yapmayı dene.'});
+      if(existing.rows[0]){
+        const r=await pool.query('UPDATE yanki_users SET username=$1,password_hash=$2 WHERE id=$3 RETURNING id,username,email,avatar_data',[username,passwordHash,existing.rows[0].id]);user=r.rows[0];
+      }else{
+        const r=await pool.query('INSERT INTO yanki_users(username,email,password_hash,email_verified) VALUES($1,$2,$3,FALSE) RETURNING id,username,email,avatar_data',[username,email,passwordHash]);user=r.rows[0];
+      }
+      await pool.query('INSERT INTO yanki_verification_codes(user_id,code_hash,expires_at,sent_at,attempts) VALUES($1,$2,NOW()+INTERVAL \'10 minutes\',NOW(),0) ON CONFLICT(user_id) DO UPDATE SET code_hash=EXCLUDED.code_hash,expires_at=EXCLUDED.expires_at,sent_at=EXCLUDED.sent_at,attempts=0',[user.id,codeDigest(code)]);
+    }
+    catch(e){
+      if(e.code==='23505'&&String(e.constraint||'').includes('username'))return json(res,409,{error:'Bu kullanıcı adı zaten kullanılıyor. Başka bir kullanıcı adı seç.'});
+      if(e.code==='23505'&&String(e.constraint||'').includes('email'))return json(res,409,{error:'Bu e-posta zaten kayıtlı. Giriş yapmayı dene.'});
+      if(e.code==='23505')return json(res,409,{error:'Kullanıcı adı veya e-posta kullanımda. Bilgileri kontrol et.'});
+      throw e;
+    }
     try { await deliverCode(email,code); return json(res,202,{pending:true,email}); }
     catch(e){console.error('Verification email delivery failed.');return json(res,502,{error:'Doğrulama e-postası gönderilemedi. Biraz sonra yeniden gönder.'});}
   }
