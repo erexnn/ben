@@ -1,6 +1,7 @@
 services:
   - type: web
     name: yanki-sesli-sohbet
+    rootDir: yanki-dagitim
     runtime: node
     plan: free
     buildCommand: npm install
