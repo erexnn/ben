@@ -16,6 +16,14 @@ function cookies(req) { return Object.fromEntries((req.headers.cookie || '').spl
 function sessionCookie(token, maxAge = 60 * 60 * 24 * 30) { return `${cookieName}=${encodeURIComponent(token)}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${maxAge}${process.env.NODE_ENV === 'production' ? '; Secure' : ''}`; }
 function publicUser(row) { return { id: row.id, username: row.username, email: row.email, avatar: row.avatar_data || null }; }
 function codeDigest(code) { return crypto.createHmac('sha256', process.env.EMAIL_CODE_SECRET || 'local-yanki-email-code-secret').update(code).digest('hex'); }
+async function sendVerificationCode(userId,email,force=false) {
+  const previous=await pool.query('SELECT sent_at FROM yanki_verification_codes WHERE user_id=$1',[userId]);
+  if(!force&&previous.rows[0]&&Date.now()-new Date(previous.rows[0].sent_at).getTime()<60000)return false;
+  const code=String(crypto.randomInt(100000,1000000));
+  await pool.query('INSERT INTO yanki_verification_codes(user_id,code_hash,expires_at,sent_at,attempts) VALUES($1,$2,NOW()+INTERVAL \'10 minutes\',NOW(),0) ON CONFLICT(user_id) DO UPDATE SET code_hash=EXCLUDED.code_hash,expires_at=EXCLUDED.expires_at,sent_at=EXCLUDED.sent_at,attempts=0',[userId,codeDigest(code)]);
+  try { await deliverCode(email,code); return true; }
+  catch(error) { await pool.query('DELETE FROM yanki_verification_codes WHERE user_id=$1',[userId]); throw error; }
+}
 async function deliverCode(email, code) {
   if (!process.env.GMAIL_USER || !process.env.GMAIL_APP_PASSWORD) throw new Error('Gmail gönderici hesabı ayarlanmamış.');
   const transporter=nodemailer.createTransport({service:'gmail',auth:{user:process.env.GMAIL_USER,pass:process.env.GMAIL_APP_PASSWORD.replace(/\s/g,'')}});
@@ -48,12 +56,14 @@ async function authApi(req, res, pathname) {
       throw e;
     }
     try { await deliverCode(email,code); return json(res,202,{pending:true,email}); }
-    catch(e){console.error('Verification email delivery failed.');return json(res,502,{error:'Doğrulama e-postası gönderilemedi. Biraz sonra yeniden gönder.'});}
+    catch(e){await pool.query('DELETE FROM yanki_verification_codes WHERE user_id=$1',[user.id]);console.error('Verification email delivery failed.');return json(res,502,{error:'Doğrulama e-postası gönderilemedi. Gmail ayarlarını kontrol et veya biraz sonra yeniden dene.'});}
   }
   if (pathname === '/api/login' && req.method === 'POST') {
     const b=await readJson(req); const email=String(b.email||'').trim().toLowerCase(); const password=String(b.password||''); const r=await pool.query('SELECT id,username,email,avatar_data,password_hash,email_verified FROM yanki_users WHERE email=$1',[email]); const row=r.rows[0];
     if(!row)return json(res,401,{error:'E-posta veya şifre hatalı.'}); const [saltHex,hashHex]=row.password_hash.split(':'); const actual=await scrypt(password,Buffer.from(saltHex,'hex'),64); const expected=Buffer.from(hashHex,'hex');
-    if(actual.length!==expected.length||!crypto.timingSafeEqual(actual,expected))return json(res,401,{error:'E-posta veya şifre hatalı.'}); if(!row.email_verified)return json(res,403,{error:'Önce e-posta adresini doğrula.',needsVerification:true,email:row.email}); await createSession(row.id,res); return json(res,200,{user:publicUser(row)});
+    if(actual.length!==expected.length||!crypto.timingSafeEqual(actual,expected))return json(res,401,{error:'E-posta veya şifre hatalı.'});
+    if(!row.email_verified){try{const codeSent=await sendVerificationCode(row.id,row.email);return json(res,403,{error:codeSent?'Doğrulama kodunu e-posta adresine gönderdik.':'Kod kısa süre önce gönderildi. Gelen kutunu ve spam klasörünü kontrol et.',needsVerification:true,email:row.email,codeSent});}catch(error){console.error('Verification email delivery failed.');return json(res,502,{error:'Doğrulama e-postası gönderilemedi. Render e-posta ayarlarını kontrol etmek gerekiyor.',needsVerification:true,email:row.email});}}
+    await createSession(row.id,res); return json(res,200,{user:publicUser(row)});
   }
   if(pathname==='/api/verify-email'&&req.method==='POST'){
     const b=await readJson(req);const email=String(b.email||'').trim().toLowerCase();const code=String(b.code||'').trim();if(!/^\d{6}$/.test(code))return json(res,400,{error:'6 haneli kodu gir.'});
@@ -65,8 +75,7 @@ async function authApi(req, res, pathname) {
   if(pathname==='/api/resend-code'&&req.method==='POST'){
     const b=await readJson(req);const email=String(b.email||'').trim().toLowerCase();const r=await pool.query('SELECT id,email_verified FROM yanki_users WHERE email=$1',[email]);const user=r.rows[0];if(!user||user.email_verified)return json(res,200,{ok:true});
     const v=await pool.query('SELECT sent_at FROM yanki_verification_codes WHERE user_id=$1',[user.id]);if(v.rows[0]&&Date.now()-new Date(v.rows[0].sent_at).getTime()<60000)return json(res,429,{error:'Yeni kod istemeden önce bir dakika bekle.'});
-    const code=String(crypto.randomInt(100000,1000000));await pool.query('INSERT INTO yanki_verification_codes(user_id,code_hash,expires_at,sent_at,attempts) VALUES($1,$2,NOW()+INTERVAL \'10 minutes\',NOW(),0) ON CONFLICT(user_id) DO UPDATE SET code_hash=EXCLUDED.code_hash,expires_at=EXCLUDED.expires_at,sent_at=EXCLUDED.sent_at,attempts=0',[user.id,codeDigest(code)]);
-    try{await deliverCode(email,code);return json(res,200,{ok:true})}catch(e){console.error('Verification email delivery failed.');return json(res,502,{error:'E-posta gönderilemedi. Daha sonra yeniden dene.'})}
+    try{await sendVerificationCode(user.id,email,true);return json(res,200,{ok:true})}catch(e){console.error('Verification email delivery failed.');return json(res,502,{error:'Doğrulama e-postası gönderilemedi. Render e-posta ayarlarını kontrol etmek gerekiyor.'})}
   }
   if (pathname === '/api/logout' && req.method === 'POST') { const token=cookies(req)[cookieName]; if(token)await pool.query('DELETE FROM yanki_sessions WHERE token_hash=$1',[crypto.createHash('sha256').update(token).digest('hex')]); return json(res,200,{ok:true},{'Set-Cookie':sessionCookie('',0)}); }
   const user=await getUser(req);
