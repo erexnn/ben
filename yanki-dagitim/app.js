@@ -15,7 +15,7 @@ function addPerson(id,name,isSelf=false){
 }
 function updateCount(){$('peopleCount').textContent=`${peerNames.size} ${peerNames.size===1?'kişi':'kişi'} odada`}
 function removePerson(id){document.getElementById(`person-${id}`)?.remove();peerNames.delete(id);connections.get(id)?.close();connections.delete(id);updateCount()}
-async function connect(room){
+async function connect(room,createRoom=false){
   const name=nameInput.value.trim()||'Misafir';
   try{localStream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true},video:false})}
   catch(e){toast(e.name==='NotAllowedError'?'Mikrofon izni gerekli.':'Mikrofonuna erişemedim.');return}
@@ -23,11 +23,11 @@ async function connect(room){
   $('initial').textContent=name[0].toUpperCase();$('roomCode').textContent=roomCode;roomInput.value=roomCode;
   welcome.classList.add('hidden');roomView.classList.remove('hidden');$('people').innerHTML='';peerNames.clear();
   socket=new WebSocket(`${location.protocol==='https:'?'wss':'ws'}://${location.host}`);
-  socket.onopen=()=>send({type:'join',room:roomCode,name});
+  socket.onopen=()=>send({type:'join',room:roomCode,name,create:createRoom});
   socket.onerror=()=>toast('Sunucuya bağlanılamadı.');
   socket.onclose=()=>{if(!roomView.classList.contains('hidden'))toast('Bağlantı kesildi. Yeniden katılmayı deneyebilirsin.')};
   socket.onmessage=async event=>{const m=JSON.parse(event.data);
-    if(m.type==='error'){toast(m.message);return}
+    if(m.type==='error'){toast(m.message);socket.close();localStream?.getTracks().forEach(t=>t.stop());localStream=null;roomView.classList.add('hidden');welcome.classList.remove('hidden');return}
     // The newcomer waits for existing room members to initiate. This avoids
     // both peers creating offers at once (WebRTC offer glare).
     if(m.type==='joined'){myId=m.id;addPerson(myId,name,true);for(const p of m.peers)addPerson(p.id,p.name)}
@@ -49,7 +49,7 @@ function makePeer(id){
 }
 async function createOffer(id){const pc=makePeer(id);const offer=await pc.createOffer();await pc.setLocalDescription(offer);send({type:'offer',to:id,sdp:pc.localDescription})}
 function startMeter(stream,id){try{const ctx=new AudioContext(),src=ctx.createMediaStreamSource(stream),a=ctx.createAnalyser();a.fftSize=256;src.connect(a);const data=new Uint8Array(a.frequencyBinCount);const tick=()=>{a.getByteFrequencyData(data);let sum=0;for(const n of data)sum+=n;const c=document.getElementById(`person-${id}`);if(c)c.classList.toggle('talking',sum/data.length>20);if(!roomView.classList.contains('hidden'))requestAnimationFrame(tick);else ctx.close()};tick()}catch{}}
-$('create').onclick=()=>{roomInput.value=randomCode();connect(roomInput.value)};
+$('create').onclick=()=>{roomInput.value=randomCode();connect(roomInput.value,true)};
 $('join').onclick=()=>connect(roomInput.value);
 roomInput.addEventListener('keydown',e=>{if(e.key==='Enter')connect(roomInput.value)});
 nameInput.addEventListener('input',()=>{$('initial').textContent=(nameInput.value.trim()[0]||'M').toUpperCase()});
