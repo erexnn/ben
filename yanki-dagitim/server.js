@@ -4,7 +4,8 @@ const path = require('path');
 const crypto = require('crypto');
 const root = __dirname;
 const server = http.createServer((req, res) => {
-  const file = req.url === '/' ? 'index.html' : path.basename(req.url.split('?')[0]);
+  const pathname = new URL(req.url, `http://${req.headers.host || 'localhost'}`).pathname;
+  const file = pathname === '/' ? 'index.html' : path.basename(pathname);
   const types = { 'index.html': 'text/html; charset=utf-8', 'app.js': 'text/javascript; charset=utf-8', 'style.css': 'text/css; charset=utf-8' };
   fs.readFile(path.join(root, file), (err, data) => { if (err) { res.writeHead(404); return res.end('Not found'); } res.writeHead(200, { 'Content-Type': types[file] || 'application/octet-stream' }); res.end(data); });
 });
@@ -49,3 +50,4 @@ server.on('upgrade', (req, ws) => {
 });
 const port = process.env.PORT || 3000;
 server.listen(port, () => console.log(`Sesli Sohbet hazır: http://localhost:${port}`));
+
