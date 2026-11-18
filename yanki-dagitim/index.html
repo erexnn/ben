@@ -3,11 +3,11 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="theme-color" content="#111313" />
+  <meta name="theme-color" content="#f4ead8" />
   <title>Yankı — arkadaşlarınla sesli sohbet</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/style.css" />
 </head>
 <body>
@@ -33,6 +33,13 @@
           <label for="loginEmail">E-posta</label><input id="loginEmail" type="email" required autocomplete="email" placeholder="ornek@mail.com" />
           <label for="loginPassword">Şifre</label><input id="loginPassword" type="password" required autocomplete="current-password" placeholder="Şifren" />
           <button class="join-button auth-submit" type="submit">Giriş yap <span class="arrow">↗</span></button>
+        </form>
+        <form id="verifyForm" class="auth-form hidden">
+          <p class="verify-copy" id="verifyCopy">E-postana 6 haneli bir kod gönderdik.</p>
+          <label for="verificationCode">Doğrulama kodu</label><input id="verificationCode" inputmode="numeric" autocomplete="one-time-code" maxlength="6" pattern="[0-9]{6}" required placeholder="000000" />
+          <button class="join-button auth-submit" type="submit">E-postayı doğrula <span class="arrow">↗</span></button>
+          <button type="button" id="resendCode" class="text-button">Kodu yeniden gönder</button>
+          <button type="button" id="changeEmail" class="text-button subtle">E-posta adresini değiştir</button>
         </form>
         <div class="card-foot"><span class="lock">⌑</span> Kullanıcı adınla arkadaşların seni tanıyabilir.</div>
       </div>
@@ -68,8 +75,9 @@
     <section class="room-view hidden" id="roomView">
       <div class="room-heading"><div><div class="room-label"><i></i> SES ODASI</div><h2>Bir arada.</h2><p>Güzel bir sohbet için yeterince yakın.</p></div><button class="share" id="copy"><span>♧</span> Davet bağlantısını kopyala</button></div>
       <div class="room-code"><span>ODA KODU</span><strong id="roomCode">——</strong><button id="copyCode" aria-label="Oda kodunu kopyala">⧉</button></div>
+      <section class="live-stage hidden" id="liveStage"><video id="liveVideo" autoplay playsinline></video><div class="live-caption"><span class="on-air"><i></i> CANLI</span><strong id="liveName">Yayın</strong></div><button id="stopLive" class="live-stop hidden">Yayını bitir</button></section>
       <div class="people" id="people"></div>
-      <div class="room-footer"><div class="live"><i></i><span id="peopleCount">1 kişi odada</span></div><div class="controls"><button id="mute" class="control"><span class="mic-icon">♩</span><span id="muteLabel">Mikrofonu kapat</span></button><button id="leave" class="leave"><span>↗</span> Odadan ayrıl</button></div></div>
+      <div class="room-footer"><div class="live"><i></i><span id="peopleCount">1 kişi odada</span></div><div class="controls"><button id="broadcast" class="broadcast"><span class="broadcast-dot"></span><span id="broadcastLabel">Yayına başla</span></button><button id="mute" class="control"><span class="mic-icon">♩</span><span id="muteLabel">Mikrofonu kapat</span></button><button id="leave" class="leave"><span>↗</span> Odadan ayrıl</button></div></div>
     </section>
 
     <footer class="footer"><span>yankı <span class="footer-dot">•</span> küçük anlar, büyük sohbetler</span><span class="footer-right">Birlikte daha güzel <span>✳</span></span></footer>
