@@ -14,9 +14,4 @@ services:
         fromDatabase:
           name: yanki-db
           property: connectionString
-databases:
-  - name: yanki-db
-    plan: free
-    databaseName: yanki
-    user: yanki
 
