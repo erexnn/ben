@@ -14,8 +14,8 @@ function readJson(req) { return new Promise((resolve, reject) => { let raw = '';
 function cookies(req) { return Object.fromEntries((req.headers.cookie || '').split(';').map(x => x.trim()).filter(Boolean).map(x => { const i=x.indexOf('='); return [x.slice(0,i), decodeURIComponent(x.slice(i+1))]; })); }
 function sessionCookie(token, maxAge = 60 * 60 * 24 * 30) { return `${cookieName}=${encodeURIComponent(token)}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${maxAge}${process.env.NODE_ENV === 'production' ? '; Secure' : ''}`; }
 function publicUser(row) { return { id: row.id, username: row.username, email: row.email, avatar: row.avatar_data || null }; }
-async function getUser(req) { const token = cookies(req)[cookieName]; if (!token) return null; const tokenHash = crypto.createHash('sha256').update(token).digest('hex'); const r = await pool.query('SELECT u.id,u.username,u.email,u.avatar_data FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=$1 AND s.expires_at>NOW()', [tokenHash]); return r.rows[0] || null; }
-async function createSession(userId, res) { const token = crypto.randomBytes(32).toString('base64url'); const hash = crypto.createHash('sha256').update(token).digest('hex'); const expiry = new Date(Date.now() + sessionMs); await pool.query('INSERT INTO sessions(token_hash,user_id,expires_at) VALUES($1,$2,$3)', [hash,userId,expiry]); res.setHeader('Set-Cookie', sessionCookie(token)); }
+async function getUser(req) { const token = cookies(req)[cookieName]; if (!token) return null; const tokenHash = crypto.createHash('sha256').update(token).digest('hex'); const r = await pool.query('SELECT u.id,u.username,u.email,u.avatar_data FROM yanki_sessions s JOIN yanki_users u ON u.id=s.user_id WHERE s.token_hash=$1 AND s.expires_at>NOW()', [tokenHash]); return r.rows[0] || null; }
+async function createSession(userId, res) { const token = crypto.randomBytes(32).toString('base64url'); const hash = crypto.createHash('sha256').update(token).digest('hex'); const expiry = new Date(Date.now() + sessionMs); await pool.query('INSERT INTO yanki_sessions(token_hash,user_id,expires_at) VALUES($1,$2,$3)', [hash,userId,expiry]); res.setHeader('Set-Cookie', sessionCookie(token)); }
 async function authApi(req, res, pathname) {
   if (pathname === '/api/register' && req.method === 'POST') {
     const b = await readJson(req); const username=String(b.username||'').trim(); const email=String(b.email||'').trim().toLowerCase(); const password=String(b.password||'');
@@ -23,22 +23,22 @@ async function authApi(req, res, pathname) {
     if (email.length>254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return json(res,400,{error:'Geçerli bir e-posta adresi yaz.'});
     if (password.length<8 || password.length>200) return json(res,400,{error:'Şifre en az 8 karakter olmalı.'});
     const salt=crypto.randomBytes(16); const hash=await scrypt(password,salt,64);
-    try { const r=await pool.query('INSERT INTO users(username,email,password_hash) VALUES($1,$2,$3) RETURNING id,username,email,avatar_data',[username,email,`${salt.toString('hex')}:${hash.toString('hex')}`]); await createSession(r.rows[0].id,res); return json(res,201,{user:publicUser(r.rows[0])}); }
+    try { const r=await pool.query('INSERT INTO yanki_users(username,email,password_hash) VALUES($1,$2,$3) RETURNING id,username,email,avatar_data',[username,email,`${salt.toString('hex')}:${hash.toString('hex')}`]); await createSession(r.rows[0].id,res); return json(res,201,{user:publicUser(r.rows[0])}); }
     catch(e){if(e.code==='23505')return json(res,409,{error:'Bu kullanıcı adı veya e-posta zaten kullanılıyor.'});throw e;}
   }
   if (pathname === '/api/login' && req.method === 'POST') {
-    const b=await readJson(req); const email=String(b.email||'').trim().toLowerCase(); const password=String(b.password||''); const r=await pool.query('SELECT id,username,email,avatar_data,password_hash FROM users WHERE email=$1',[email]); const row=r.rows[0];
+    const b=await readJson(req); const email=String(b.email||'').trim().toLowerCase(); const password=String(b.password||''); const r=await pool.query('SELECT id,username,email,avatar_data,password_hash FROM yanki_users WHERE email=$1',[email]); const row=r.rows[0];
     if(!row)return json(res,401,{error:'E-posta veya şifre hatalı.'}); const [saltHex,hashHex]=row.password_hash.split(':'); const actual=await scrypt(password,Buffer.from(saltHex,'hex'),64); const expected=Buffer.from(hashHex,'hex');
     if(actual.length!==expected.length||!crypto.timingSafeEqual(actual,expected))return json(res,401,{error:'E-posta veya şifre hatalı.'}); await createSession(row.id,res); return json(res,200,{user:publicUser(row)});
   }
-  if (pathname === '/api/logout' && req.method === 'POST') { const token=cookies(req)[cookieName]; if(token)await pool.query('DELETE FROM sessions WHERE token_hash=$1',[crypto.createHash('sha256').update(token).digest('hex')]); return json(res,200,{ok:true},{'Set-Cookie':sessionCookie('',0)}); }
+  if (pathname === '/api/logout' && req.method === 'POST') { const token=cookies(req)[cookieName]; if(token)await pool.query('DELETE FROM yanki_sessions WHERE token_hash=$1',[crypto.createHash('sha256').update(token).digest('hex')]); return json(res,200,{ok:true},{'Set-Cookie':sessionCookie('',0)}); }
   const user=await getUser(req);
   if (pathname === '/api/me' && req.method === 'GET') return user?json(res,200,{user:publicUser(user)}):json(res,401,{error:'Giriş yapman gerekiyor.'});
   if (pathname === '/api/profile' && req.method === 'PATCH') {
     if(!user)return json(res,401,{error:'Giriş yapman gerekiyor.'}); const b=await readJson(req); const username=String(b.username||'').trim();
     if(!/^[A-Za-z0-9_-]{3,20}$/.test(username))return json(res,400,{error:'Kullanıcı adı 3–20 karakter olmalı; harf, rakam, _ ve - kullanabilirsin.'});
     let avatar=b.avatar; if(avatar!==undefined&&avatar!==null){if(typeof avatar!=='string'||!/^data:image\/(png|jpeg|webp);base64,/.test(avatar)||avatar.length>700000)return json(res,400,{error:'Fotoğraf PNG, JPG veya WebP olmalı ve 512 KB’ı aşmamalı.'});}
-    try { const r=avatar===undefined?await pool.query('UPDATE users SET username=$1 WHERE id=$2 RETURNING id,username,email,avatar_data',[username,user.id]):await pool.query('UPDATE users SET username=$1,avatar_data=$2 WHERE id=$3 RETURNING id,username,email,avatar_data',[username,avatar,user.id]); return json(res,200,{user:publicUser(r.rows[0])}); }
+    try { const r=avatar===undefined?await pool.query('UPDATE yanki_users SET username=$1 WHERE id=$2 RETURNING id,username,email,avatar_data',[username,user.id]):await pool.query('UPDATE yanki_users SET username=$1,avatar_data=$2 WHERE id=$3 RETURNING id,username,email,avatar_data',[username,avatar,user.id]); return json(res,200,{user:publicUser(r.rows[0])}); }
     catch(e){if(e.code==='23505')return json(res,409,{error:'Bu kullanıcı adı zaten kullanılıyor.'});throw e;}
   }
   return json(res,404,{error:'Bulunamadı.'});
@@ -99,7 +99,7 @@ server.on('upgrade', async (req, ws) => {
 const port = process.env.PORT || 3000;
 async function start() {
   if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL tanımlı değil.');
-  await pool.query(`CREATE TABLE IF NOT EXISTS users (
+  await pool.query(`CREATE TABLE IF NOT EXISTS yanki_users (
     id BIGSERIAL PRIMARY KEY,
     username VARCHAR(20) NOT NULL,
     email VARCHAR(254) NOT NULL UNIQUE,
@@ -107,10 +107,10 @@ async function start() {
     avatar_data TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
   )`);
-  await pool.query('CREATE UNIQUE INDEX IF NOT EXISTS users_username_lower_idx ON users (LOWER(username))');
-  await pool.query(`CREATE TABLE IF NOT EXISTS sessions (
+  await pool.query('CREATE UNIQUE INDEX IF NOT EXISTS yanki_users_username_lower_idx ON yanki_users (LOWER(username))');
+  await pool.query(`CREATE TABLE IF NOT EXISTS yanki_sessions (
     token_hash CHAR(64) PRIMARY KEY,
-    user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    user_id BIGINT NOT NULL REFERENCES yanki_users(id) ON DELETE CASCADE,
     expires_at TIMESTAMPTZ NOT NULL
   )`);
   server.listen(port, () => console.log(`Sesli Sohbet hazır: http://localhost:${port}`));
