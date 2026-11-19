@@ -156,7 +156,6 @@ server.on('upgrade', async (req, ws) => {
         const live=roomLives.get(room)||null;
         send(ws, { type: 'joined', id: peerId, peers: [...peers.values()].map(p => ({ id: p.id, name: p.name })), live });
         for (const p of peers.values()) send(p.ws, { type: 'peer-joined', id: peerId, name }); peers.set(peerId, { id: peerId, name, ws });
-        if(live&&live.id!==peerId)send(ws,{type:'live-start',id:live.id,name:live.name});
       } else if(room&&msg.type==='live-start'){
         const active=roomLives.get(room);if(active&&active.id!==peerId){send(ws,{type:'live-error',message:'Bu odada zaten bir yayın açık.'});continue;}
         const live={id:peerId,name};roomLives.set(room,live);for(const p of rooms.get(room)?.values()||[])if(p.id!==peerId)send(p.ws,{type:'live-start',...live});
@@ -164,6 +163,8 @@ server.on('upgrade', async (req, ws) => {
         if(roomLives.get(room)?.id===peerId){roomLives.delete(room);for(const p of rooms.get(room)?.values()||[])if(p.id!==peerId)send(p.ws,{type:'live-stop',id:peerId});}
       } else if(room&&msg.type==='live-viewer-join'){
         const live=roomLives.get(room);const broadcaster=live&&rooms.get(room)?.get(live.id);if(broadcaster)send(broadcaster.ws,{type:'live-viewer-join',from:peerId,name});else send(ws,{type:'live-stop',id:live?.id});
+      } else if(room&&msg.type==='live-viewer-leave'){
+        const broadcaster=roomLives.get(room)&&rooms.get(room)?.get(roomLives.get(room).id);if(broadcaster)send(broadcaster.ws,{type:'live-viewer-leave',from:peerId});
       } else if(room&&['live-offer','live-answer','live-candidate'].includes(msg.type)){
         const to=rooms.get(room)?.get(msg.to);if(to)send(to.ws,{...msg,from:peerId,name});
       } else if (room && ['offer', 'answer', 'candidate', 'mute'].includes(msg.type)) {
