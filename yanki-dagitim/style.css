@@ -74,4 +74,7 @@ html,body{min-height:100%;background:var(--wc-bg)!important;color:var(--wc-text)
 .voice-member-avatar{width:23px;height:23px;display:grid;place-items:center;border-radius:50%;background:var(--wc-purple-2);color:white;font-size:10px;font-weight:700}
 .voice-member small{color:var(--wc-muted);font-size:9px}
 .voice-members:empty:after{content:'Henüz katılımcı yok';color:var(--wc-muted);font-size:11px}
+.room-connection-status{margin:8px 0 0;color:var(--wc-muted);font-size:11px;line-height:1.45}
+.controls #enableMic{background:var(--wc-purple-2);border-color:var(--wc-purple);color:#fff}
+.controls button:disabled{opacity:.55;cursor:wait}
 
