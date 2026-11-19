@@ -73,8 +73,8 @@ async function startLive(){const q=$('liveQuality')?.value||'1080';const [w,h]=q
 function stopLive(notify=true){if(notify&&liveStream)send({type:'live-stop'});liveStream?.getTracks().forEach(t=>t.stop());liveStream=null;livePeers.forEach(pc=>pc.close());livePeers.clear();liveBroadcaster=null;$('liveVideo').srcObject=null;$('liveStage').classList.add('hidden');$('stopLive').classList.add('hidden');$('broadcast').classList.remove('active');$('broadcastLabel').textContent='Yayına başla'}
 function startMeter(stream,id){try{const ctx=new AudioContext(),src=ctx.createMediaStreamSource(stream),a=ctx.createAnalyser();a.fftSize=256;src.connect(a);const data=new Uint8Array(a.frequencyBinCount);const tick=()=>{a.getByteFrequencyData(data);let sum=0;for(const n of data)sum+=n;const c=document.getElementById(`person-${id}`);if(c)c.classList.toggle('talking',sum/data.length>20);if(!roomView.classList.contains('hidden'))requestAnimationFrame(tick);else ctx.close()};tick()}catch{}}
 $('create').onclick=()=>{roomInput.value=randomCode();connect(roomInput.value,true)};
-$('enableMic').onclick=enableMicrophone;
-$('broadcast').onclick=()=>liveStream?stopLive(true):liveBroadcaster?toast('Bu odada zaten bir canlı yayın var.'):startLive();$('stopLive').onclick=()=>stopLive(true);
+$('enableMic').onclick=enableMicrophone;$('voiceDockMic').onclick=enableMicrophone;
+const toggleLive=()=>liveStream?stopLive(true):liveBroadcaster?toast('Bu odada zaten bir canlı yayın var.'):startLive();$('broadcast').onclick=toggleLive;$('voiceDockBroadcast').onclick=toggleLive;$('stopLive').onclick=()=>stopLive(true);
 $('join').onclick=()=>connect(roomInput.value);
 roomInput.addEventListener('keydown',e=>{if(e.key==='Enter')connect(roomInput.value)});
 $('mute').onclick=()=>{muted=!muted;localStream?.getAudioTracks().forEach(t=>t.enabled=!muted);$('mute').classList.toggle('active',muted);$('muteLabel').textContent=muted?'Mikrofonu aç':'Mikrofonu kapat';send({type:'mute',muted});const c=document.getElementById(`person-${myId}`);if(c){c.querySelector('.person-meta').textContent=muted?'Mikrofon kapalı':'Bu cihaz';c.querySelector('.person-mic').textContent=muted?'⊘':'♩'}};
