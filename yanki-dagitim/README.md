@@ -1,13 +1,13 @@
-# Yankı — sesli sohbet
+# WizzChat — topluluk sohbeti
 
-Arkadaşlarınla davet koduyla sesli sohbet etmek için küçük bir web uygulaması. Arayüz Türkçedir; kullanıcılar e-posta, kullanıcı adı ve şifreyle hesap açar, profillerini düzenleyip fotoğraf ekleyebilir. Hesap, profil ve oturum bilgileri PostgreSQL'de tutulur. Ses WebRTC ile katılımcılar arasında aktarılır.
+Türkçe topluluk iletişimi için web uygulaması. Üyeler topluluk oluşturup davet koduyla arkadaşlarını ekleyebilir; metin ve ses kanalları, oda içi kamera yayını, profil düzenleme ve temel mesaj tepkileri bulunur. Hesap, topluluk, mesaj ve oturum bilgileri PostgreSQL'de tutulur. Ses ve kamera WebRTC ile katılımcılar arasında aktarılır.
 
 ## İnternette yayımlama (Render)
 
 1. Bu klasörü bir GitHub deposuna yükle.
 2. Render hesabında **New → Blueprint** seçip bu depoyu bağla.
 3. Render, `render.yaml` ayarlarıyla web servisini mevcut `yanki-db` PostgreSQL veritabanına bağlar. Veritabanı aynı Render çalışma alanında bulunmalıdır. Dağıtım tamamlanınca `https://...onrender.com` adresini arkadaşlarınla paylaş.
-4. Hesap oluşturmak için kullanıcı adı, e-posta adresi ve şifre gir. Doğrudan giriş yaptıktan sonra oda oluşturabilir, davet bağlantısını kullanabilir ve oda içinden kamera yayınını başlatabilirsin. Mikrofon ve kamera izni için HTTPS adresini kullan.
+4. Hesap oluşturmak için kullanıcı adı, e-posta adresi ve şifre gir. Girişten sonra topluluk oluşturabilir, davet koduyla katılabilir, metin/ses kanalları açabilir ve kamera yayını başlatabilirsin. Mikrofon ve kamera izni için HTTPS adresini kullan.
 
 Ücretsiz servis bir süre kullanılmayınca uykuya geçebilir; ilk açılışın başlaması biraz sürebilir. Ücretsiz sunucu WebSocket sinyalleşmesini destekler. Bazı ağlarda WebRTC ses bağlantısı STUN ile kurulamayabilir; daha yüksek bağlantı başarısı için TURN servisi eklenmesi gerekir.
 
