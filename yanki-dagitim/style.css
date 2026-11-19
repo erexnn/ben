@@ -68,4 +68,10 @@ html,body{min-height:100%;background:var(--wc-bg)!important;color:var(--wc-text)
 .action-select-row label{display:block;margin-bottom:6px;color:var(--wc-muted);font-size:11px}
 .action-select-row select{width:100%;padding:10px;background:var(--wc-bg);border:1px solid var(--wc-border);border-radius:8px;color:var(--wc-text)}
 @media(max-width:650px){.chat-message{grid-template-columns:34px minmax(0,1fr);gap:9px;padding:10px}.message-avatar{width:32px;height:32px}}
+.voice-channel-roster{margin:20px 0 10px;padding:13px 15px;background:var(--wc-panel);border:1px solid var(--wc-border);border-radius:10px}
+.voice-members{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.voice-member{display:flex;align-items:center;gap:8px;min-height:34px;padding:5px 10px 5px 6px;border:1px solid var(--wc-border);border-radius:999px;background:var(--wc-panel-2);color:var(--wc-text);font-size:11px}
+.voice-member-avatar{width:23px;height:23px;display:grid;place-items:center;border-radius:50%;background:var(--wc-purple-2);color:white;font-size:10px;font-weight:700}
+.voice-member small{color:var(--wc-muted);font-size:9px}
+.voice-members:empty:after{content:'Henüz katılımcı yok';color:var(--wc-muted);font-size:11px}
 
