@@ -69,6 +69,21 @@ async function authApi(req, res, pathname) {
   if(pathname==='/api/reactions'&&req.method==='POST'){
     const b=await readJson(req),messageId=String(b.messageId||''),emoji=String(b.emoji||'');if(!['👍','❤️','😂','🔥','🎉'].includes(emoji))return json(res,400,{error:'Bu tepki kullanılamıyor.'});const access=await pool.query('SELECT 1 FROM yanki_messages x JOIN yanki_channels c ON c.id=x.channel_id JOIN yanki_community_members m ON m.community_id=c.community_id WHERE x.id=$1 AND m.user_id=$2',[messageId,user.id]);if(!access.rowCount)return json(res,404,{error:'Mesaj bulunamadı.'});const found=await pool.query('SELECT 1 FROM yanki_reactions WHERE message_id=$1 AND user_id=$2 AND emoji=$3',[messageId,user.id,emoji]);if(found.rowCount)await pool.query('DELETE FROM yanki_reactions WHERE message_id=$1 AND user_id=$2 AND emoji=$3',[messageId,user.id,emoji]);else await pool.query('INSERT INTO yanki_reactions(message_id,user_id,emoji) VALUES($1,$2,$3)',[messageId,user.id,emoji]);const counts=await pool.query('SELECT emoji,COUNT(*)::int AS count FROM yanki_reactions WHERE message_id=$1 GROUP BY emoji',[messageId]);return json(res,200,{reactions:counts.rows});
   }
+  if(pathname==='/api/friends'&&req.method==='GET'){
+    const r=await pool.query(`SELECT f.status,f.requested_by,CASE WHEN f.user_a_id=$1 THEN b.id ELSE a.id END AS id,CASE WHEN f.user_a_id=$1 THEN b.username ELSE a.username END AS username,CASE WHEN f.user_a_id=$1 THEN b.avatar_data ELSE a.avatar_data END AS avatar FROM yanki_friendships f JOIN yanki_users a ON a.id=f.user_a_id JOIN yanki_users b ON b.id=f.user_b_id WHERE f.user_a_id=$1 OR f.user_b_id=$1 ORDER BY f.updated_at DESC`,[user.id]);return json(res,200,{friends:r.rows});
+  }
+  if(pathname==='/api/friends'&&req.method==='POST'){
+    const b=await readJson(req),username=String(b.username||'').trim();const target=await pool.query('SELECT id,username FROM yanki_users WHERE LOWER(username)=LOWER($1)',[username]);if(!target.rows[0])return json(res,404,{error:'Bu kullanıcı adıyla hesap bulunamadı.'});if(String(target.rows[0].id)===String(user.id))return json(res,400,{error:'Kendini arkadaş olarak ekleyemezsin.'});const ids=await pool.query('SELECT LEAST($1::bigint,$2::bigint) AS a,GREATEST($1::bigint,$2::bigint) AS b',[user.id,target.rows[0].id]);const existing=await pool.query('SELECT status,requested_by FROM yanki_friendships WHERE user_a_id=$1 AND user_b_id=$2',[ids.rows[0].a,ids.rows[0].b]);if(existing.rows[0]){if(existing.rows[0].status==='accepted')return json(res,409,{error:'Bu kişi zaten arkadaşlarında.'});if(String(existing.rows[0].requested_by)!==String(user.id)){await pool.query('UPDATE yanki_friendships SET status=\'accepted\',updated_at=NOW() WHERE user_a_id=$1 AND user_b_id=$2',[ids.rows[0].a,ids.rows[0].b]);return json(res,200,{ok:true,accepted:true})}return json(res,409,{error:'Arkadaşlık isteği zaten gönderilmiş.'})}await pool.query('INSERT INTO yanki_friendships(user_a_id,user_b_id,requested_by,status) VALUES($1,$2,$3,\'pending\')',[ids.rows[0].a,ids.rows[0].b,user.id]);return json(res,201,{ok:true});
+  }
+  if(pathname==='/api/friends/accept'&&req.method==='POST'){
+    const b=await readJson(req),friendId=String(b.friendId||'');const r=await pool.query('UPDATE yanki_friendships SET status=\'accepted\',updated_at=NOW() WHERE user_a_id=LEAST($1::bigint,$2::bigint) AND user_b_id=GREATEST($1::bigint,$2::bigint) AND requested_by<>$1 AND status=\'pending\' RETURNING user_a_id',[user.id,friendId]);if(!r.rowCount)return json(res,404,{error:'Bekleyen bir arkadaşlık isteği bulunamadı.'});return json(res,200,{ok:true});
+  }
+  if(pathname==='/api/dms'&&req.method==='GET'){
+    const url=new URL(req.url,`http://${req.headers.host||'localhost'}`),friendId=url.searchParams.get('userId'),after=url.searchParams.get('after')||'0';const access=await pool.query('SELECT 1 FROM yanki_friendships WHERE user_a_id=LEAST($1::bigint,$2::bigint) AND user_b_id=GREATEST($1::bigint,$2::bigint) AND status=\'accepted\'',[user.id,friendId]);if(!access.rowCount)return json(res,403,{error:'Özel mesaj için önce arkadaş olmalısınız.'});const r=await pool.query('SELECT d.id,d.content,d.created_at,u.id AS user_id,u.username,u.avatar_data AS avatar FROM yanki_dm_messages d JOIN yanki_users u ON u.id=d.sender_id WHERE ((d.sender_id=$1 AND d.recipient_id=$2) OR (d.sender_id=$2 AND d.recipient_id=$1)) AND d.id>$3 ORDER BY d.id DESC LIMIT 80',[user.id,friendId,after]);return json(res,200,{messages:r.rows.reverse()});
+  }
+  if(pathname==='/api/dms'&&req.method==='POST'){
+    const b=await readJson(req),friendId=String(b.userId||''),content=String(b.content||'').trim();if(!content||content.length>4000)return json(res,400,{error:'Mesaj 1–4000 karakter arasında olmalı.'});const access=await pool.query('SELECT 1 FROM yanki_friendships WHERE user_a_id=LEAST($1::bigint,$2::bigint) AND user_b_id=GREATEST($1::bigint,$2::bigint) AND status=\'accepted\'',[user.id,friendId]);if(!access.rowCount)return json(res,403,{error:'Özel mesaj için önce arkadaş olmalısınız.'});const r=await pool.query('INSERT INTO yanki_dm_messages(sender_id,recipient_id,content) VALUES($1,$2,$3) RETURNING id,content,created_at',[user.id,friendId,content]);return json(res,201,{message:{...r.rows[0],user_id:user.id,username:user.username,avatar:user.avatar_data}});
+  }
   if (pathname === '/api/logout' && req.method === 'POST') { const token=cookies(req)[cookieName]; if(token)await pool.query('DELETE FROM yanki_sessions WHERE token_hash=$1',[crypto.createHash('sha256').update(token).digest('hex')]); return json(res,200,{ok:true},{'Set-Cookie':sessionCookie('',0)}); }
   if (pathname === '/api/me' && req.method === 'GET') return user?json(res,200,{user:publicUser(user)}):json(res,401,{error:'Giriş yapman gerekiyor.'});
   if (pathname === '/api/profile' && req.method === 'PATCH') {
@@ -202,6 +217,23 @@ async function start() {
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     PRIMARY KEY(message_id,user_id,emoji)
   )`);
+  await pool.query(`CREATE TABLE IF NOT EXISTS yanki_friendships (
+    user_a_id BIGINT NOT NULL REFERENCES yanki_users(id) ON DELETE CASCADE,
+    user_b_id BIGINT NOT NULL REFERENCES yanki_users(id) ON DELETE CASCADE,
+    requested_by BIGINT NOT NULL REFERENCES yanki_users(id) ON DELETE CASCADE,
+    status VARCHAR(12) NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','accepted')),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY(user_a_id,user_b_id), CHECK(user_a_id<user_b_id)
+  )`);
+  await pool.query(`CREATE TABLE IF NOT EXISTS yanki_dm_messages (
+    id BIGSERIAL PRIMARY KEY,
+    sender_id BIGINT NOT NULL REFERENCES yanki_users(id) ON DELETE CASCADE,
+    recipient_id BIGINT NOT NULL REFERENCES yanki_users(id) ON DELETE CASCADE,
+    content VARCHAR(4000) NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  )`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS yanki_dm_pair_id_idx ON yanki_dm_messages(sender_id,recipient_id,id)`);
   server.listen(port, () => console.log(`Sesli Sohbet hazır: http://localhost:${port}`));
 }
 start().catch(error => { console.error('Başlatma hatası:', error.message); process.exit(1); });
