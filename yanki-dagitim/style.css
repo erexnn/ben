@@ -78,3 +78,17 @@ html,body{min-height:100%;background:var(--wc-bg)!important;color:var(--wc-text)
 .controls #enableMic{background:var(--wc-purple-2);border-color:var(--wc-purple);color:#fff}
 .controls button:disabled{opacity:.55;cursor:wait}
 
+
+/* Responsive member cards and mobile navigation */
+.member-list{gap:9px}
+.member-row{display:flex;align-items:center;gap:11px;padding:11px 10px!important;border:1px solid var(--wc-border);background:var(--wc-bg);border-radius:10px;min-width:0}
+.member-avatar{width:40px;height:40px;flex:none;display:grid;place-items:center;overflow:hidden;border-radius:50%;background:var(--wc-purple-2);color:#fff;font-size:14px;font-weight:700}
+.member-info{min-width:0;display:flex;flex-direction:column;gap:5px}
+.member-info strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px}
+.member-status{display:flex;align-items:center;gap:6px;color:var(--wc-muted);font-size:10px}
+.member-status i{width:7px;height:7px;border-radius:50%;background:#43c780;flex:none}
+@media(max-width:950px){.community-app{grid-template-columns:56px 205px minmax(0,1fr)}.member-sidebar{display:none}.community-app.members-open{grid-template-columns:56px 205px minmax(0,1fr) 210px}.community-app.members-open .member-sidebar{display:block;min-width:0}}
+@media(max-width:650px){.topbar{padding:0 12px}.community-app{grid-template-columns:46px minmax(0,1fr);min-height:calc(100dvh - 66px)}.guild-rail{grid-column:1;grid-row:1 / span 2;padding:10px 4px}.guild-rail button{width:36px;height:36px}.channel-sidebar{grid-column:2;grid-row:1;max-height:32dvh;min-height:180px;border-right:0;border-bottom:1px solid var(--wc-border)}.account-strip{display:none}.chat-panel{grid-column:2;grid-row:2;min-height:calc(68dvh - 66px)}.chat-header{padding:0 9px}.chat-header-note{display:none}.chat-messages{padding:12px 8px}.message-composer{margin:0 7px 8px;padding:8px 9px 22px}.message-composer textarea{font-size:16px}.chat-tools button{padding:6px}.footer{display:none}.community-app.members-open{grid-template-columns:46px minmax(0,1fr)}.community-app.members-open .member-sidebar{display:block;position:fixed;z-index:30;top:66px;right:0;bottom:0;width:min(310px,86vw);overflow-y:auto;box-shadow:-18px 0 45px #0005;border-left:1px solid var(--wc-border)}.member-row{padding:12px!important}.room-view{width:100%;padding:0 14px;margin:24px auto 28px}.room-heading h2{font-size:38px}.room-code{gap:9px;padding:12px}.room-footer{padding-bottom:10px}.controls{grid-template-columns:1fr 1fr;gap:8px}.control,.leave,.broadcast{min-height:42px}.toast{width:calc(100vw - 28px);text-align:center;bottom:18px}}
+
+.member-close{display:none;border:1px solid var(--wc-border);border-radius:7px;padding:5px 8px;background:var(--wc-panel-2);color:var(--wc-text);font:inherit;cursor:pointer}
+@media(max-width:650px){.member-close{display:block}}
