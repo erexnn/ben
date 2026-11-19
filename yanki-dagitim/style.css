@@ -40,4 +40,5 @@ body{background-color:var(--bg);background-image:radial-gradient(#25231f12 .7px,
 .profile-modal{background:#25231f99}.modal-close{color:var(--line)}.photo-button{border-color:var(--line);border-radius:1px;color:#c43b27;font-family:'DM Mono',monospace}
 .verify-copy{color:#625d53;font-size:12px;line-height:1.5}
 @media(max-width:650px){.room-heading h2{font-size:47px}.room-view{margin-top:43px}.controls{grid-template-columns:1fr 1fr}.broadcast{justify-content:center;padding:0 7px;font-size:9px}.live-stage{aspect-ratio:4/3}}
+.friend-entry{font-size:10px}.friend-entry:disabled{opacity:.6;cursor:default}.friends-empty{padding:8px;color:#8f909e;font-size:10px;line-height:1.6}.guild-home{background:#343540;color:#c4b0ff}.guild-home.active{background:#9d7cff;color:#fff}
 
