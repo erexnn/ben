@@ -92,3 +92,5 @@ html,body{min-height:100%;background:var(--wc-bg)!important;color:var(--wc-text)
 
 .member-close{display:none;border:1px solid var(--wc-border);border-radius:7px;padding:5px 8px;background:var(--wc-panel-2);color:var(--wc-text);font:inherit;cursor:pointer}
 @media(max-width:650px){.member-close{display:block}}
+
+.voice-dock{padding:10px 16px;border-top:1px solid var(--wc-border);background:var(--wc-panel);display:flex;align-items:center;gap:12px;color:var(--wc-text)}.voice-dock-users{display:flex;gap:8px;flex:1}.voice-dock-users>*{padding:5px 9px;border-radius:20px;background:var(--wc-panel-2);color:var(--wc-text);font-size:12px}.voice-dock button,.chat-panel select{border:1px solid var(--wc-border);border-radius:7px;background:var(--wc-panel-2);color:var(--wc-text);padding:7px;cursor:pointer}.hidden{display:none!important}
