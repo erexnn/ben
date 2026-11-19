@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="theme-color" content="#f4ead8" />
-  <title>Yankı — arkadaşlarınla sesli sohbet</title>
+  <title>WizzChat — toplulukların buluşma yeri</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&display=swap" rel="stylesheet" />
@@ -13,12 +13,12 @@
 <body>
   <main class="shell">
     <header class="topbar">
-      <a class="brand" href="#" aria-label="Yankı ana sayfa"><span class="brand-mark"><span></span><span></span><span></span><span></span><span></span></span><span>yankı</span></a>
+      <a class="brand" href="#" aria-label="WizzChat ana sayfa"><span class="brand-mark"><span></span><span></span><span></span><span></span><span></span></span><span>WizzChat</span></a>
       <div class="topbar-right"><span class="status"><i></i> Bağlantı hazır</span><button class="avatar" id="profileButton" aria-label="Profili düzenle"><span id="initial">M</span></button></div>
     </header>
 
     <section class="auth-view" id="authView">
-      <div class="eyebrow"><span class="eyebrow-line"></span> YANKI'YA KATIL <span class="eyebrow-line"></span></div>
+      <div class="eyebrow"><span class="eyebrow-line"></span> WIZZCHAT'E KATIL <span class="eyebrow-line"></span></div>
       <h1>Önce <span>tanışalım.</span></h1>
       <p class="lead">Arkadaşlarınla sesli sohbet etmek için hesabını oluştur.</p>
       <div class="join-card auth-card">
@@ -54,6 +54,35 @@
       <p class="privacy-note"><span>◈</span> Sesin kaydedilmez, sunucuya gönderilmez.</p>
     </section>
 
+    <section class="community-app hidden" id="communityApp">
+      <nav class="guild-rail" aria-label="Topluluklar">
+        <button class="guild-home active" id="homeGuild" title="Ana sayfa">W</button>
+        <div class="guild-divider"></div>
+        <div id="communityRail" class="community-rail-list"></div>
+        <button class="guild-add" id="createCommunity" title="Topluluk oluştur">＋</button>
+        <button class="guild-join" id="joinCommunity" title="Davet koduyla katıl">↗</button>
+      </nav>
+      <aside class="channel-sidebar">
+        <header class="community-heading"><button id="communityPicker" class="community-picker">Topluluk seç <span>⌄</span></button><button id="communityInvite" class="icon-button" title="Davet kodunu kopyala">⧉</button></header>
+        <div class="channel-scroll">
+          <div class="side-section-title"><span>KANALLAR</span><button id="addChannel" title="Kanal ekle">＋</button></div>
+          <div id="channelList" class="channel-list"></div>
+          <div id="voicePeople" class="voice-people"></div>
+        </div>
+        <footer class="account-strip"><button class="account-avatar" id="sidebarAvatar">W</button><div class="account-copy"><strong id="sidebarUsername">Kullanıcı</strong><span>Çevrimiçi</span></div><button id="sidebarProfile" class="icon-button" title="Profili düzenle">⚙</button><button id="sidebarLogout" class="icon-button" title="Çıkış yap">↪</button></footer>
+      </aside>
+      <section class="chat-panel">
+        <header class="chat-header"><div><span class="channel-kind" id="currentChannelKind">#</span><strong id="currentChannelName">genel</strong><span class="chat-header-note" id="communityNameHeader"></span></div><div class="chat-tools"><button id="copyCommunityInvite" title="Davet bağlantısını kopyala">Davet et ↗</button><button id="toggleMembers" title="Üyeler">☷</button></div></header>
+        <div class="chat-messages" id="chatMessages"><div class="welcome-empty"><div class="empty-star">✳</div><h2>WizzChat’e hoş geldin.</h2><p>Bir topluluk seç, sohbete katıl.</p></div></div>
+        <form class="message-composer" id="messageForm"><button type="button" id="emojiButton" title="Emoji">☺</button><textarea id="messageInput" rows="1" maxlength="4000" placeholder="#genel kanalına mesaj gönder" disabled></textarea><button type="submit" id="sendMessage" title="Gönder" disabled>➤</button><div class="composer-hint">Enter gönderir · Shift + Enter yeni satır</div></form>
+      </section>
+      <aside class="member-sidebar" id="memberSidebar"><div class="member-heading">ÜYELER <span id="memberCount">0</span></div><div id="memberList" class="member-list"></div></aside>
+    </section>
+
+    <section class="simple-modal hidden" id="communityModal" role="dialog" aria-modal="true" aria-labelledby="communityModalTitle">
+      <form id="communityModalForm" class="simple-modal-card"><button type="button" class="modal-x" id="closeCommunityModal" aria-label="Kapat">×</button><div class="room-label">WIZZCHAT TOPLULUKLARI</div><h2 id="communityModalTitle">Topluluk oluştur</h2><p id="communityModalDescription">Arkadaşların için yeni bir alan aç.</p><label id="communityModalLabel" for="communityModalInput">Topluluk adı</label><input id="communityModalInput" maxlength="40" required placeholder="ör. arkadaş grubu" /><div class="simple-modal-actions"><button type="button" id="switchCommunityMode" class="secondary-action">Davet kodun mu var?</button><button type="submit" id="communityModalSubmit" class="join-button">Topluluk oluştur ↗</button></div></form>
+    </section>
+
     <section class="profile-modal hidden" id="profileModal" aria-modal="true" role="dialog" aria-labelledby="profileTitle">
       <div class="profile-card">
         <div class="profile-head"><div><div class="room-label">HESABIN</div><h2 id="profileTitle">Profilini düzenle</h2></div><button id="closeProfile" class="modal-close" aria-label="Kapat">×</button></div>
@@ -73,7 +102,7 @@
       <div class="room-footer"><div class="live"><i></i><span id="peopleCount">1 kişi odada</span></div><div class="controls"><button id="broadcast" class="broadcast"><span class="broadcast-dot"></span><span id="broadcastLabel">Yayına başla</span></button><button id="mute" class="control"><span class="mic-icon">♩</span><span id="muteLabel">Mikrofonu kapat</span></button><button id="leave" class="leave"><span>↗</span> Odadan ayrıl</button></div></div>
     </section>
 
-    <footer class="footer"><span>yankı <span class="footer-dot">•</span> küçük anlar, büyük sohbetler</span><span class="footer-right">Birlikte daha güzel <span>✳</span></span></footer>
+    <footer class="footer"><span>WizzChat <span class="footer-dot">•</span> toplulukların buluşma yeri</span><span class="footer-right">Birlikte daha güzel <span>✳</span></span></footer>
     <div id="toast" class="toast" role="status"></div>
   </main>
   <script src="/app.js"></script>
