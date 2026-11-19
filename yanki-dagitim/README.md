@@ -1,6 +1,16 @@
 # WizzChat — topluluk sohbeti
 
-Türkçe topluluk iletişimi için web uygulaması. Üyeler arkadaş ekleyip bire bir mesajlaşabilir, topluluk oluşturup davet bağlantısıyla arkadaşlarını ekleyebilir; metin ve ses kanalları, oda içi kamera yayını, profil düzenleme ve temel mesaj tepkileri bulunur. Hesap, topluluk, mesaj ve oturum bilgileri PostgreSQL'de tutulur. Ses ve kamera WebRTC ile katılımcılar arasında aktarılır.
+Türkçe topluluk iletişimi için Discord tarzı web uygulaması. Üyeler arkadaş ekleyip özel mesajlaşabilir; kategorili topluluk kanalları açabilir; tepkiler kullanabilir, mesajlarını düzenleyebilir, dosya ekleyebilir ve topluluklarındaki mesajları arayabilir. Ses kanalları, mikrofon ve ekran paylaşımı WebRTC ile çalışır. Hesap, topluluk, mesaj, ek ve oturum bilgileri PostgreSQL'de tutulur.
+
+## Mevcut işlevler ve sınırlar
+
+- Arkadaş listesi, gelen/giden istekler ve bire bir mesajlar
+- Topluluk davetleri, metin/ses kanalları ve kullanıcı tanımlı kanal kategorileri
+- Mesaj arama, eski arama sonucuna gitme, kendi mesajını düzenleme ve emoji tepkileri
+- PNG/JPG/WebP, PDF ve TXT ekleri (dosya başına 500 KB, mesaj başına toplam 540 KB)
+- WebRTC ses, mikrofon denetimi ve ekran paylaşımı
+
+Bu proje Discord hesabı, API'si veya servis altyapısıyla uyumlu değildir. Roller için izin matrisi, grup DM, thread/forum, bot ve uygulama dizini, etkinlik, gelişmiş moderasyon, bildirim ve Discord'un diğer servis özellikleri bu uygulamada bulunmaz. Ekler PostgreSQL'de tutulduğu için dosya boyutu özellikle sınırlıdır.
 
 ## İnternette yayımlama (Render)
 
