@@ -47,3 +47,25 @@ html,body{min-height:100%;background:var(--wc-bg)!important;color:var(--wc-text)
 @media(max-width:950px){.community-app{grid-template-columns:56px 205px minmax(0,1fr)}.member-sidebar{display:none}}
 @media(max-width:650px){.topbar{padding:0 14px}.status{font-size:0}.community-app{grid-template-columns:48px minmax(0,1fr);min-height:calc(100vh - 66px)}.guild-rail{grid-column:1;grid-row:1 / span 2;padding:10px 4px}.guild-rail button{width:38px;height:38px}.channel-sidebar{grid-column:2;grid-row:1;max-height:34vh;border-right:0;border-bottom:1px solid var(--wc-border)}.account-strip{display:none}.chat-panel{grid-column:2;grid-row:2;min-height:60vh}.chat-header{padding:0 10px}.chat-messages{padding:14px 10px}.message-composer{margin:0 8px 10px}.chat-tools button{padding:6px}.footer{display:none}}
 
+/* Keep each speaker and each conversation visually distinct. */
+.chat-messages{display:flex;flex-direction:column;align-items:stretch;gap:10px}
+.chat-message{display:grid;grid-template-columns:42px minmax(0,1fr);gap:12px;align-items:start;padding:12px 14px;border:1px solid var(--wc-border);border-radius:12px;background:var(--wc-panel);box-shadow:0 3px 12px #0000000c}
+.chat-message.own-message{border-left:3px solid var(--wc-purple);background:color-mix(in srgb,var(--wc-panel) 88%,var(--wc-purple) 12%)}
+.message-avatar,.friend-avatar{width:38px;height:38px;display:grid;place-items:center;overflow:hidden;flex:none;border:1px solid var(--wc-border);border-radius:50%;background:var(--wc-purple-2);color:white;font-weight:700}
+.message-avatar img,.friend-avatar img,.member-avatar img,.account-avatar img,.avatar img{width:100%;height:100%;object-fit:cover;border-radius:inherit}
+.message-body{min-width:0}
+.message-meta{display:flex;align-items:baseline;gap:9px;margin:1px 0 5px}
+.message-meta strong{color:var(--wc-text);font-size:13px}
+.message-meta time{color:var(--wc-muted);font-size:10px}
+.message-body>p{margin:0;color:var(--wc-text);font-size:13px;line-height:1.55;overflow-wrap:anywhere;white-space:pre-wrap}
+.message-reactions{min-height:0;margin-top:4px}
+.message-reactions button{border:0;border-radius:6px;background:transparent;color:var(--wc-muted);cursor:pointer}
+.message-reactions button:hover{background:var(--wc-panel-2);color:var(--wc-purple)}
+.friend-entry{display:flex!important;gap:9px!important;align-items:center!important}
+.friend-avatar{width:30px;height:30px;font-size:11px}
+.friend-label{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.action-select-row{margin-top:12px}
+.action-select-row label{display:block;margin-bottom:6px;color:var(--wc-muted);font-size:11px}
+.action-select-row select{width:100%;padding:10px;background:var(--wc-bg);border:1px solid var(--wc-border);border-radius:8px;color:var(--wc-text)}
+@media(max-width:650px){.chat-message{grid-template-columns:34px minmax(0,1fr);gap:9px;padding:10px}.message-avatar{width:32px;height:32px}}
+
