@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="theme-color" content="#f4ead8" />
+  <meta name="theme-color" content="#1c1d24" />
   <title>WizzChat — toplulukların buluşma yeri</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -56,7 +56,7 @@
 
     <section class="community-app hidden" id="communityApp">
       <nav class="guild-rail" aria-label="Topluluklar">
-        <button class="guild-home active" id="homeGuild" title="Ana sayfa">W</button>
+        <button class="guild-home" id="homeGuild" title="Arkadaşlar ve özel mesajlar">✉</button>
         <div class="guild-divider"></div>
         <div id="communityRail" class="community-rail-list"></div>
         <button class="guild-add" id="createCommunity" title="Topluluk oluştur">＋</button>
@@ -65,7 +65,7 @@
       <aside class="channel-sidebar">
         <header class="community-heading"><button id="communityPicker" class="community-picker">Topluluk seç <span>⌄</span></button><button id="communityInvite" class="icon-button" title="Davet kodunu kopyala">⧉</button></header>
         <div class="channel-scroll">
-          <div class="side-section-title"><span>KANALLAR</span><button id="addChannel" title="Kanal ekle">＋</button></div>
+          <div class="side-section-title"><span id="sideListTitle">KANALLAR</span><button id="addChannel" title="Kanal ekle">＋</button></div>
           <div id="channelList" class="channel-list"></div>
           <div id="voicePeople" class="voice-people"></div>
         </div>
