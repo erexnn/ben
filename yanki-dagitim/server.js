@@ -132,7 +132,7 @@ server.on('upgrade', async (req, ws) => {
   const key = req.headers['sec-websocket-key']; if (!key) return ws.destroy();
   const accept = crypto.createHash('sha1').update(key + '258EAFA5-E914-47DA-95CA-C5AB0DC85B11').digest('base64');
   ws.write('HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: ' + accept + '\r\n\r\n');
-  ws.buffer = Buffer.alloc(0); let room, peerId, name=user.username;
+  ws.buffer = Buffer.alloc(0); let room, peerId, name=user.username;const avatar=user.avatar_data||null;
   ws.on('data', chunk => {
     ws.buffer = Buffer.concat([ws.buffer, chunk]);
     while (ws.buffer.length >= 2) {
@@ -154,8 +154,8 @@ server.on('upgrade', async (req, ws) => {
         }
         peerId = Math.random().toString(36).slice(2, 9); const peers = rooms.get(room);
         const live=roomLives.get(room)||null;
-        send(ws, { type: 'joined', id: peerId, peers: [...peers.values()].map(p => ({ id: p.id, name: p.name })), live });
-        for (const p of peers.values()) send(p.ws, { type: 'peer-joined', id: peerId, name }); peers.set(peerId, { id: peerId, name, ws });
+        send(ws, { type: 'joined', id: peerId, name, avatar, peers: [...peers.values()].map(p => ({ id: p.id, name: p.name, avatar:p.avatar })) , live });
+        for (const p of peers.values()) send(p.ws, { type: 'peer-joined', id: peerId, name, avatar }); peers.set(peerId, { id: peerId, name, avatar, ws });
       } else if(room&&msg.type==='live-start'){
         const active=roomLives.get(room);if(active&&active.id!==peerId){send(ws,{type:'live-error',message:'Bu odada zaten bir yayın açık.'});continue;}
         const live={id:peerId,name};roomLives.set(room,live);for(const p of rooms.get(room)?.values()||[])if(p.id!==peerId)send(p.ws,{type:'live-start',...live});
