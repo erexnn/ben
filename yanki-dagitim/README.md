@@ -1,6 +1,6 @@
 # WizzChat — topluluk sohbeti
 
-Türkçe topluluk iletişimi için web uygulaması. Üyeler topluluk oluşturup davet koduyla arkadaşlarını ekleyebilir; metin ve ses kanalları, oda içi kamera yayını, profil düzenleme ve temel mesaj tepkileri bulunur. Hesap, topluluk, mesaj ve oturum bilgileri PostgreSQL'de tutulur. Ses ve kamera WebRTC ile katılımcılar arasında aktarılır.
+Türkçe topluluk iletişimi için web uygulaması. Üyeler arkadaş ekleyip bire bir mesajlaşabilir, topluluk oluşturup davet bağlantısıyla arkadaşlarını ekleyebilir; metin ve ses kanalları, oda içi kamera yayını, profil düzenleme ve temel mesaj tepkileri bulunur. Hesap, topluluk, mesaj ve oturum bilgileri PostgreSQL'de tutulur. Ses ve kamera WebRTC ile katılımcılar arasında aktarılır.
 
 ## İnternette yayımlama (Render)
 
